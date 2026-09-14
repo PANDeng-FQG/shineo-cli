@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://shineo.app"><strong>Shineo</strong></a>
+  <img src="assets/shineo-logo.svg" width="96" alt="Shineo logo">
 </p>
 
 <h1 align="center">Shineo CLI</h1>
