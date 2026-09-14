@@ -72,6 +72,34 @@ CI 或自动化环境使用令牌：
 shineo auth login --token "$SHINEO_TOKEN"
 ```
 
+CLI 默认连接 Shineo 官方服务。如需连接其他 Shineo 服务，可使用独立 profile：
+
+```bash
+# 登录生产环境
+shineo auth login
+
+# 登录另一个 Shineo 服务
+shineo --profile local --host http://localhost:3000 auth login
+
+# 查看和切换当前环境
+shineo config list
+shineo config use production
+shineo config use local
+```
+
+也可以为自定义环境创建 profile：
+
+```bash
+shineo --profile staging --host https://staging-api.example.com auth login
+```
+
+查看当前 profile 和 API 地址：
+
+```bash
+shineo config get
+shineo auth status
+```
+
 认证信息保存在用户级配置目录，不会写入项目目录。检查当前登录状态：
 
 ```bash
@@ -139,6 +167,7 @@ CLI 不包装 Vite、Webpack 或其他本地开发服务器。需要本地预览
 --language zh-CN       使用中文输出
 --language en-US       使用英文输出
 --host <url>           覆盖当前 Shineo API 地址
+--profile <name>       使用指定的 API 配置 profile
 ```
 
 JSON 结果写入 stdout，进度和错误写入 stderr，适合脚本和 CI 使用。
@@ -213,6 +242,8 @@ Skill 和工具结果默认直接输出，不会安装到本地 Skill 目录。�
 ```
 
 源码保持普通目录结构。认证令牌保存在用户级配置中，不进入 Git 仓库，也不会写入 `.shineo.json`。`.shineo.json` 已加入本仓库 `.gitignore`，避免把具体项目绑定信息提交到公开仓库。
+
+用户级配置支持多个 API profile。使用 `--profile <name>` 或 `shineo config use <name>` 选择服务。
 
 ## Agent Skill
 

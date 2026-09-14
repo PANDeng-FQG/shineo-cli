@@ -4,7 +4,7 @@ import open from "open";
 import { ApiClient } from "../api/api-client.js";
 import { writeConfig, type ShineoConfig } from "../config/config-store.js";
 
-export async function loginInBrowser(api: ApiClient, config: ShineoConfig, provider?: string): Promise<void> {
+export async function loginInBrowser(api: ApiClient, config: ShineoConfig, provider?: string, profileName?: string): Promise<void> {
   if (provider !== undefined && provider !== "google" && provider !== "github") throw new Error("登录方式只能是 google 或 github。");
   const publicConfig = await api.get<{ supabaseUrl: string; anonKey: string; appUrl: string }>("/cli/v1/auth/config");
   const codeVerifier = randomBytes(32).toString("base64url");
@@ -30,7 +30,7 @@ export async function loginInBrowser(api: ApiClient, config: ShineoConfig, provi
       : await exchangePkceCode(publicConfig.supabaseUrl, publicConfig.anonKey, code, codeVerifier);
     const nextConfig: ShineoConfig = { ...config, accessToken: exchanged.access_token };
     if (exchanged.refresh_token) nextConfig.refreshToken = exchanged.refresh_token;
-    await writeConfig(nextConfig);
+    await writeConfig(nextConfig, profileName);
   } finally {
     await callback.close();
   }

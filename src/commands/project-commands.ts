@@ -56,7 +56,7 @@ export async function cloneProject(api: ApiClient, output: OutputWriter, project
 export async function pullProject(api: ApiClient, output: OutputWriter): Promise<void> {
   const config = await readProjectConfig();
   const manifest = await downloadSource(api, config.projectId, process.cwd(), output);
-  const nextConfig: ProjectConfig = { ...config, revisionId: manifest.revisionId ?? manifest.ref ?? null };
+  const nextConfig: ProjectConfig = { ...config, apiUrl: api.baseUrl, revisionId: manifest.revisionId ?? manifest.ref ?? null };
   const entry = manifest.entry ?? config.entry;
   const dependencies = manifest.dependencies ?? config.dependencies;
   if (entry !== undefined) nextConfig.entry = entry ? normalizeProjectPath(entry) : entry;
@@ -92,7 +92,7 @@ export async function pushProject(api: ApiClient, output: OutputWriter, message:
     throw formatProjectPushError(error, config.revisionId ?? null, remote.revisionId ?? remote.ref ?? null);
   }
   const revisionId = readString(revision.id ?? revision.revisionId);
-  await writeProjectConfig({ ...config, ...(revisionId ? { revisionId } : {}) });
+  await writeProjectConfig({ ...config, apiUrl: api.baseUrl, ...(revisionId ? { revisionId } : {}) });
   output.result({ ...revision, changed: true, ...summary });
 }
 

@@ -1,6 +1,6 @@
 # Shineo CLI 命令参考
 
-所有命令都支持根级 `--json`、`--verbose`、`--language zh-CN|en-US` 和 `--host <url>`。JSON 键保持英文稳定。
+所有命令都支持根级 `--json`、`--verbose`、`--language zh-CN|en-US`、`--host <url>` 和 `--profile <name>`。JSON 键保持英文稳定。
 
 ## 认证和工作区
 
@@ -16,6 +16,18 @@ shineo workspace members <workspaceId>
 ```
 
 令牌只存放在用户级配置目录。不要写入 `.shineo.json`、源码、命令历史或构建产物。
+
+CLI 默认使用 `production` profile，地址为 `https://api.shineo.app`。其他 Shineo 服务可以使用独立 profile：
+
+```bash
+shineo --profile local --host http://localhost:3000 auth login
+shineo config list
+shineo config use production
+shineo config use local
+shineo config get
+```
+
+profile 用于保存不同服务的连接配置。
 
 ## 项目
 

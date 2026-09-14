@@ -2,6 +2,7 @@ import { readConfig, type ShineoConfig } from "../config/config-store.js";
 
 export type ApiClientOptions = {
   apiUrl?: string;
+  profile?: string;
   accessToken?: string;
   verbose?: boolean;
 };
@@ -23,7 +24,7 @@ export class ApiClient {
   }
 
   static async create(options: ApiClientOptions = {}): Promise<ApiClient> {
-    return new ApiClient(options, await readConfig());
+    return new ApiClient(options, await readConfig(options.profile));
   }
 
   get baseUrl(): string {

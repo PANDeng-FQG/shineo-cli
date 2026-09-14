@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { ApiClient } from "./api/api-client.js";
-import { readConfig, readProjectConfig, writeConfig } from "./config/config-store.js";
+import { listConfigProfiles, readConfig, readProjectConfig, useConfigProfile, writeConfig } from "./config/config-store.js";
 import { loginInBrowser } from "./auth/browser-login.js";
 import { OutputWriter } from "./output/output-writer.js";
 import { buildProject, cloneProject, createProject, deploySourceProject, listProjects, projectStatus, pullProject, pushProject } from "./commands/project-commands.js";
@@ -11,33 +11,51 @@ import { executeDataApi, executeDataTool, initializeDataApiSdk, listFields } fro
 import { deleteMedia, importMedia, listMedia, mediaAction, uploadMedia, viewMedia } from "./commands/media-commands.js";
 
 const program = new Command();
-program.name("shineo").description("Shineo 平台命令行工具").version("0.1.0");
-program.option("--json", "输出 JSON").option("--verbose", "输出请求调试信息").option("--language <language>", "输出语言", "zh-CN").option("--host <url>", "覆盖 API 地址");
+program.name("shineo").description("Shineo 平台命令行工具").version("0.1.2");
+program.option("--json", "输出 JSON").option("--verbose", "输出请求调试信息").option("--language <language>", "输出语言", "zh-CN").option("--host <url>", "覆盖 API 地址").option("--profile <name>", "使用 API 配置 profile");
 
 const auth = program.command("auth");
 auth.command("status").action(async () => {
-  const config = await readConfig();
-  new OutputWriter({ json: program.opts().json }).result({ apiUrl: config.apiUrl, authenticated: Boolean(config.accessToken) });
+  const config = await readConfig(program.opts().profile);
+  new OutputWriter({ json: program.opts().json }).result({ profile: config.profile, apiUrl: config.apiUrl, authenticated: Boolean(config.accessToken) });
 });
 auth.command("logout").action(async () => {
-  const config = await readConfig();
-  const nextConfig = { apiUrl: config.apiUrl } as import("./config/config-store.js").ShineoConfig;
+  const config = await readConfig(program.opts().profile);
+  const nextConfig = { apiUrl: config.apiUrl, profile: config.profile } as import("./config/config-store.js").ShineoConfig;
   if (config.language) nextConfig.language = config.language;
-  await writeConfig(nextConfig);
-  new OutputWriter({ json: program.opts().json }).result({ loggedOut: true });
+  await writeConfig(nextConfig, config.profile);
+  new OutputWriter({ json: program.opts().json }).result({ loggedOut: true, profile: config.profile });
 });
-auth.command("login").option("--token <token>", "Shineo 访问令牌").option("--provider <provider>", "OAuth 登录提供商").action(async (options) => {
-  const config = await readConfig();
+auth.command("login").option("--token <token>", "Shineo 访问令牌").option("--provider <provider>", "OAuth 登录提供商").option("--profile <name>", "保存到 API 配置 profile").action(async (options) => {
+  const profile = options.profile ?? program.opts().profile;
+  const config = await readConfig(profile);
   const nextApiUrl = program.opts().host ? program.opts().host as string : config.apiUrl;
-  const nextConfig = { ...config, apiUrl: nextApiUrl };
+  const nextConfig = { ...config, apiUrl: nextApiUrl, ...(profile ? { profile } : {}) };
   if (options.token) {
     nextConfig.accessToken = options.token;
   } else {
-    await loginInBrowser(await ApiClient.create({ apiUrl: nextApiUrl }), nextConfig, options.provider);
+    await loginInBrowser(await ApiClient.create({ apiUrl: nextApiUrl, ...(profile ? { profile } : {}) }), nextConfig, options.provider, profile);
   }
-  if (options.token) await writeConfig(nextConfig);
-  new OutputWriter({ json: program.opts().json }).result({ loggedIn: true });
+  if (options.token) await writeConfig(nextConfig, profile);
+  new OutputWriter({ json: program.opts().json }).result({ loggedIn: true, profile: nextConfig.profile });
 });
+
+const configCommand = program.command("config");
+configCommand.command("list").action(async () => runConfig((output) => listConfigProfiles().then(output.result.bind(output))));
+configCommand.command("get").action(async () => runConfig(async (output) => {
+  const config = await readConfig(program.opts().profile);
+  output.result({ profile: config.profile, apiUrl: config.apiUrl, authenticated: Boolean(config.accessToken), language: config.language ?? null });
+}));
+configCommand.command("use").argument("<profile>").action(async (profile) => runConfig(async (output) => {
+  const config = await useConfigProfile(profile);
+  output.result({ profile: config.profile, apiUrl: config.apiUrl, authenticated: Boolean(config.accessToken) });
+}));
+configCommand.command("set").argument("<key>").argument("<value>").action(async (key, value) => runConfig(async (output) => {
+  if (key !== "api-url") throw new Error("目前只支持设置 api-url。");
+  const config = await readConfig(program.opts().profile);
+  await writeConfig({ ...config, apiUrl: value }, config.profile);
+  output.result({ profile: config.profile, apiUrl: value });
+}));
 
 const workspace = program.command("workspace");
 workspace.command("list").action(async () => run((api, output) => api.get("/user/workspaces").then(output.result.bind(output))));
@@ -161,8 +179,19 @@ async function run(action: (api: ApiClient, output: OutputWriter) => Promise<voi
   try {
     const options = program.opts();
     const output = new OutputWriter({ json: Boolean(options.json), language: options.language });
-    const api = await ApiClient.create({ ...(options.host ? { apiUrl: options.host } : {}), verbose: Boolean(options.verbose) });
+    const api = await ApiClient.create({ ...(options.host ? { apiUrl: options.host } : {}), ...(options.profile ? { profile: options.profile } : {}), verbose: Boolean(options.verbose) });
     await action(api, output);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`shineo: ${message}\n`);
+    process.exitCode = 1;
+  }
+}
+
+async function runConfig(action: (output: OutputWriter) => Promise<void>): Promise<void> {
+  try {
+    const options = program.opts();
+    await action(new OutputWriter({ json: Boolean(options.json), language: options.language }));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`shineo: ${message}\n`);
